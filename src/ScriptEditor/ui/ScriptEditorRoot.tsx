@@ -173,10 +173,11 @@ export function Root(props: IProps): React.ReactElement {
   useEffect(() => {
     function maybeSave(event: KeyboardEvent): void {
       if (Settings.DisableHotkeys) return;
-      //Ctrl + b
+      // Ctrl/CMD + b
       if (event.keyCode == 66 && (event.ctrlKey || event.metaKey)) {
         event.preventDefault();
         save();
+        close();
       }
 
       // CTRL/CMD + S
@@ -204,6 +205,7 @@ export function Root(props: IProps): React.ReactElement {
           });
           MonacoVim.VimMode.Vim.defineEx("quit", "q", function () {
             save();
+            close();
           });
           editor.focus();
         });
@@ -444,6 +446,19 @@ export function Root(props: IProps): React.ReactElement {
 
   function saveScript(scriptToSave: OpenScript): void {
     const server = GetServer(scriptToSave.hostname);
+
+    if (scriptToSave.fileName == "") {
+      dialogBoxCreate("You must specify a filename!");
+      return;
+    }
+
+    if (!isValidFilePath(scriptToSave.fileName)) {
+      dialogBoxCreate(
+        "Script filename can contain only alphanumerics, hyphens, and underscores, and must end with an extension.",
+      );
+      return;
+    }
+
     if (server === null) throw new Error("Server should not be null but it is.");
     if (isScriptFilename(scriptToSave.fileName)) {
       //If the current script already exists on the server, overwrite it
@@ -456,7 +471,6 @@ export function Root(props: IProps): React.ReactElement {
             server.scripts,
           );
           if (Settings.SaveGameOnFileSave) saveObject.saveGame();
-          props.router.toTerminal();
           return;
         }
       }
@@ -470,7 +484,6 @@ export function Root(props: IProps): React.ReactElement {
         if (server.textFiles[i].fn === scriptToSave.fileName) {
           server.textFiles[i].write(scriptToSave.code);
           if (Settings.SaveGameOnFileSave) saveObject.saveGame();
-          props.router.toTerminal();
           return;
         }
       }
@@ -482,7 +495,6 @@ export function Root(props: IProps): React.ReactElement {
     }
 
     if (Settings.SaveGameOnFileSave) saveObject.saveGame();
-    props.router.toTerminal();
   }
 
   function save(): void {
@@ -511,57 +523,10 @@ export function Root(props: IProps): React.ReactElement {
       return;
     }
 
-    if (currentScript.fileName == "") {
-      dialogBoxCreate("You must specify a filename!");
-      return;
-    }
+    saveScript(currentScript);
+  }
 
-    if (!isValidFilePath(currentScript.fileName)) {
-      dialogBoxCreate(
-        "Script filename can contain only alphanumerics, hyphens, and underscores, and must end with an extension.",
-      );
-      return;
-    }
-
-    const server = GetServer(currentScript.hostname);
-    if (server === null) throw new Error("Server should not be null but it is.");
-    if (isScriptFilename(currentScript.fileName)) {
-      //If the current script already exists on the server, overwrite it
-      for (let i = 0; i < server.scripts.length; i++) {
-        if (currentScript.fileName == server.scripts[i].filename) {
-          server.scripts[i].saveScript(
-            currentScript.fileName,
-            currentScript.code,
-            props.player.currentServer,
-            server.scripts,
-          );
-          if (Settings.SaveGameOnFileSave) saveObject.saveGame();
-          props.router.toTerminal();
-          return;
-        }
-      }
-
-      //If the current script does NOT exist, create a new one
-      const script = new Script();
-      script.saveScript(currentScript.fileName, currentScript.code, props.player.currentServer, server.scripts);
-      server.scripts.push(script);
-    } else if (currentScript.fileName.endsWith(".txt")) {
-      for (let i = 0; i < server.textFiles.length; ++i) {
-        if (server.textFiles[i].fn === currentScript.fileName) {
-          server.textFiles[i].write(currentScript.code);
-          if (Settings.SaveGameOnFileSave) saveObject.saveGame();
-          props.router.toTerminal();
-          return;
-        }
-      }
-      const textFile = new TextFile(currentScript.fileName, currentScript.code);
-      server.textFiles.push(textFile);
-    } else {
-      dialogBoxCreate("Invalid filename. Must be either a script (.script, .js, or .ns) or " + " or text file (.txt)");
-      return;
-    }
-
-    if (Settings.SaveGameOnFileSave) saveObject.saveGame();
+  function close(): void {
     props.router.toTerminal();
   }
 
@@ -779,7 +744,8 @@ export function Root(props: IProps): React.ReactElement {
           <Typography color={updatingRam ? "secondary" : "primary"} sx={{ mx: 1 }}>
             {ram}
           </Typography>
-          <Button onClick={save}>Save & Close (Ctrl/Cmd + s)</Button>
+          <Button onClick={save}>Save (Ctrl/Cmd + s)</Button>
+          <Button onClick={close}>Save & Close (Ctrl/Cmd + b)</Button>
           <Typography sx={{ mx: 1 }}>
             {" "}
             Documentation:{" "}
